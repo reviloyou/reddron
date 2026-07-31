@@ -15,9 +15,10 @@ venv/
 .vscode/*
 !.vscode/extensions.json
 
-# CAD binaries (del STEP/STL, hold Fusion-kildefiler ute)
-*.f3d
-*.f3z
+# CAD binaries (del STEP/STL, hold Solidworks på plass)
+*.sldprt
+*.sldasm
+*.slddrw
 
 # OS-søppel
 .DS_Store
