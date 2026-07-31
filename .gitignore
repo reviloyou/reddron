@@ -1,0 +1,24 @@
+# Python (pillar_b.py, test_pillar_b.py)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# PlatformIO (ESP32-firmware)
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# VS Code (behold extensions.json, ignorer resten)
+.vscode/*
+!.vscode/extensions.json
+
+# CAD binaries (del STEP/STL, hold Fusion-kildefiler ute)
+*.f3d
+*.f3z
+
+# OS-søppel
+.DS_Store
+Thumbs.db
