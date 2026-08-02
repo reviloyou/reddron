@@ -121,47 +121,47 @@ VS Code with PlatformIO.
 
 - **August 1-2:** Pillar B implemented and verified in software, five files, all tests
   passing:
-  - `pillar_b.py` — the coordinate transform chain, six steps: pixel to angle, angle to
-    body-frame direction vector, body to world frame by quaternion rotation, ground
-    intersection using LiDAR slant range, and finally geodetic coordinates.
-  - `test_pillar_b.py` — six check groups, all passing, plus a 20,000-run Monte Carlo.
-  - `synthetic_frames.py` — generates fake 32x24 thermal frames with a Gaussian hot spot.
-  - `centroid_detector.py` — finds the target by weighted centroid, subpixel precision.
-  - `test_full_pipeline.py` — 100 synthetic frames through detection and transform end
-    to end: 100/100 detections, median centroid error 0.072 m.
+  `pillar_b.py` — the coordinate transform chain, six steps: pixel to angle, angle to
+  body-frame direction vector, body to world frame by quaternion rotation, ground
+  intersection using LiDAR slant range, and finally geodetic coordinates.
+  `test_pillar_b.py` — six check groups, all passing, plus a 20,000-run Monte Carlo.
+  `synthetic_frames.py` — generates fake 32x24 thermal frames with a Gaussian hot spot.
+  `centroid_detector.py` — finds the target by weighted centroid, subpixel precision.
+  `test_full_pipeline.py` — 100 synthetic frames through detection and transform end
+  to end: 100/100 detections, median centroid error 0.072 m.
 
   Decisions locked:
-  - Camera orientation: 55 degree FOV cross-track, 35 degrees fore-aft. The wide axis
-    goes across the flight path to maximize search width per pass.
-  - Forward tilt 12.5 degrees from nadir, verified in code: at 12.5 degrees nose-down
-    cruise pitch the boresight offset is 0.0 m.
-  - Ground footprint at 5 m altitude: 3.33 m fore-aft (0.44 m behind to 2.89 m ahead),
-    5.20 m cross-track, centered 1.11 m ahead of the drone in hover.
-  - LiDAR runs continuously, not only in hover. Readings are rejected above 15 degrees
-    of tilt or outside 0.3 to 11 m.
-  - CAD moves to SolidWorks.
+  Camera orientation: 55 degree FOV cross-track, 35 degrees fore-aft. The wide axis
+  goes across the flight path to maximize search width per pass.
+  Forward tilt 12.5 degrees from nadir, verified in code: at 12.5 degrees nose-down
+  cruise pitch the boresight offset is 0.0 m.
+  Ground footprint at 5 m altitude: 3.33 m fore-aft (0.44 m behind to 2.89 m ahead),
+  5.20 m cross-track, centered 1.11 m ahead of the drone in hover.
+  LiDAR runs continuously, not only in hover. Readings are rejected above 15 degrees
+  of tilt or outside 0.3 to 11 m.
+  CAD moves to SolidWorks.
 
   Numbers locked:
-  - Median localization error at 5 m: ~0.15 m (attitude + pixel + altitude combined).
-  - Attitude dominates the error budget at 0.128 m RMS; altitude contributes 0.013 m
-    RMS, negligible near nadir. Vibration isolation on the flight controller matters
-    more to accuracy than a better rangefinder would.
-  - Calibration check recovers f_u = 29.9 from a true 30.0 under 0.3 px noise.
+  Median localization error at 5 m: ~0.15 m (attitude + pixel + altitude combined).
+  Attitude dominates the error budget at 0.128 m RMS; altitude contributes 0.013 m
+  RMS, negligible near nadir. Vibration isolation on the flight controller matters
+  more to accuracy than a better rangefinder would.
+  Calibration check recovers f_u = 29.9 from a true 30.0 under 0.3 px noise.
 
   Known limitations, written down while they are fresh:
-  - The 0.072 m pipeline result only measures detection error, since transform and
-    ground truth share the same attitude and height. The honest expected field number
-    is ~0.15 m from the Monte Carlo, and that is the figure I will quote.
-  - The datasheet-derived f_u and f_v disagree by 19.2 percent. Bench calibration
-    against a measured target is mandatory before trusting real frames.
-  - The detector cannot report "nothing there". The adaptive threshold always finds a
-    max, so an empty frame returns the centroid of a noise cluster. Needs a minimum
-    contrast or SNR gate before a detection is declared.
-  - Targets near the frame edge read biased toward the center, because the Gaussian
-    blob is truncated by the frame boundary. This will happen with the real sensor too.
-  - The SNR printout is labeled dB but the value is a plain ratio. Cosmetic, but
-    mislabeled units are the kind of thing that makes a reviewer distrust the rest.
-  - LEVER_ARM_B is a placeholder until the pod geometry is measured in SolidWorks.
+  The 0.072 m pipeline result only measures detection error, since transform and
+  ground truth share the same attitude and height. The honest expected field number
+  is ~0.15 m from the Monte Carlo, and that is the figure I will quote.
+  The datasheet-derived f_u and f_v disagree by 19.2 percent. Bench calibration
+  against a measured target is mandatory before trusting real frames.
+  The detector cannot report "nothing there". The adaptive threshold always finds a
+  max, so an empty frame returns the centroid of a noise cluster. Needs a minimum
+  contrast or SNR gate before a detection is declared.
+  Targets near the frame edge read biased toward the center, because the Gaussian
+  blob is truncated by the frame boundary. This will happen with the real sensor too.
+  The SNR printout is labeled dB but the value is a plain ratio. Cosmetic, but
+  mislabeled units are the kind of thing that makes a reviewer distrust the rest.
+  LEVER_ARM_B is a placeholder until the pod geometry is measured in SolidWorks.
 
 ## Planned
 
