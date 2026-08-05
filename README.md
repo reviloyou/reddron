@@ -83,6 +83,8 @@ VS Code with PlatformIO.
   through component selection. The suggested parts were mostly good, but I had to go
   elsewhere for the flight controller. The first suggestion was the SpeedyBee F405 V5, it has
   no verified ArduPilot target listed on ardupilot.org despite what the norwegian retailer claims.
+  [correction from later date, it does have support however i was looking at the wrong flight controller, 
+  explained in log for 05.08]
   Lesson taken forward: verify every board directly against ardupilot.org, not against
   a product page.
 - **July 14:** Settled on the MicoAir H743 V2 with a 70A AM32 AIO stack. The
@@ -162,6 +164,59 @@ VS Code with PlatformIO.
   The SNR printout is labeled dB but the value is a plain ratio. Cosmetic, but
   mislabeled units are the kind of thing that makes a reviewer distrust the rest.
   LEVER_ARM_B is a placeholder until the pod geometry is measured in SolidWorks.
+- **August 3-4:** When going through and explaining the project to an older friend of
+  mine i was put on the spot beacuse of some dangerous problems. These two days has
+  been spent trying to fix the project but still keep the intended purpose. The most
+  important change is in even more static bench tests that are verifiable and then fixing
+  the coding mistakes. Also, if you look at the code as it stands now putting two people overboard
+  or two hotspots, this would make the drone drop and think that there is a person in the 
+  middle of them. This sets us a day back and is something that will be corrected. 
+  I also found a caveat for what i was saying earlier with the speedybee F405 V5. This flight
+  controller did have full ardupilot support however was not actually beeing sold in norway, 
+  I was looking at T motor F7 flight controller.
+- **August 5:** The day started of with making the preperations needed for the first bench test.
+  This first bench test is made to understand the maratime aspect regarding the proof of concept. The 
+  background for the check is beacuse of the LIDAR sensors wavelength, for later versions it is smarter
+  either way to use radar instead of LIDAR. However, the purpose behind the proof of concept was just that,
+  make a working "cheap" proof of concept.
+  
+  This specific Bench test was completed with a breadboard, the LIDAR sensor, esp32 and a computer to
+  directly read off data from the esp32. The purpose of the test is to check if the sensor can detect the 
+  seawater and reflect at sealevel, or if it goes straight through.
+
+  The sensor is bolted flat to a rigid plate which pivots against a printed arc. The arc only locks the
+  angle, it does not define it, since print tolerance means a hole labelled 12.5 degrees is not actually
+  12.5 degrees. The angle is read off a physical protractor sitting on the same plate as the sensor,
+  referenced to nadir (straight down) as 0 degrees, and only that reading is logged. Because the arc is
+  swept across positions rather than commanded to a target, its print tolerance never enters the data:
+  the exact labelled degree does not matter, only the angle actually recorded. The whole plate sits on
+  top of a fixed 1.5 m wooden pole, set plumb, so the rig can be placed repeatably and its height
+  verified by tape to the water surface. Firmware on the esp32 validates each 9-byte frame and prints
+  one CSV line over USB, and all counting and logging happens on the laptop. Signal strength is logged
+  for every sample, not just distance, since strength is what separates the cases: a surface return is
+  strong and reads the rig height, a bottom return is weak and reads rig height plus depth, and a
+  specular reflection away from the receiver reads near zero. Distance alone cannot tell them apart.
+  Everything is saved raw, classification happens later in analysis.
+
+  Everything was verified on land first so that anything odd over water belongs to the water and not the
+  rig. Frames parse, reported distance matches a tape measure at 1 through 5 m, and a wall sweep from
+  minus 20 to plus 20 degrees locates the true boresight. That last step matters because the optical axis
+  is not guaranteed perpendicular to the housing, and a degree of offset would shift the whole angle
+  series without ever showing itself.
+
+  At the water, 200 samples per point. First the same measured height over shallow and deep water, which
+  is the test that actually answers the question. Then incidence angle from 0 to 30 degrees, run out of
+  order and with 0 repeated at the end so rig drift becomes visible. The range comes from the aircraft and
+  not the mounting, since the LIDAR points along nadir, meaning the incidence angle is just the drone's own
+  attitude, capped by ArduPilots default ANGLE_MAX of 30 degrees. Then the same again with ripples, which
+  break the specular reflection and may improve angle tolerance while making the nadir return worse. Last,
+  a dark floating object in the beam to see whether it returns where bare water does not.
+
+  Distance equal to rig height at both depths means a surface return and a valid height source. Distance
+  following the water depth means it reads the bottom, which would require 1550 nm LIDAR if we wished to
+  keep the maratime aspect, or a radar altimeter instead. A bimodal result is the awkward one, and the 
+  question then becomes whether strength separates the two modes cleanly enough to filter on. All three are 
+  valid outcomes, a negative result here is a characterised limit rather than a failure.
 
 ## Planned
 
