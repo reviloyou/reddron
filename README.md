@@ -217,6 +217,65 @@ VS Code with PlatformIO.
   keep the maratime aspect, or a radar altimeter instead. A bimodal result is the awkward one, and the 
   question then becomes whether strength separates the two modes cleanly enough to filter on. All three are 
   valid outcomes, a negative result here is a characterised limit rather than a failure.
+- **August 7-8:** Now to the actual tests on the LIDAR sensor. It was done at a shore in Alta (tollevika), 
+  evening, low sun. Sensor bolted flat to a stiff plate on the 1.5 m pole, we tested with a angle measure
+  and used a spirit level to make sure it was as straight as possible. Height above water taken with a wooden meassure.
+  200 samples per point unless noted.
+ 
+  ![Sensor and ESP32 on the plate, before going out](Medialibrary/LIDAR-bench-test/rig-closeup-field.jpg)
+ 
+  Ground calibration was done against a wall before leaving, since without it a strange number over water 
+  could just as easily be the rig. Tape-measured distances gave 0.8 m -> 82.0 cm (std 0.0), 1.2 m -> 122.0 cm 
+  (std 0.0), 2.0 m -> 202.0 cm (std 0.0), 4.0 m -> 409.0 cm (std 0.16), 6.0 m -> 624.1 cm (std 0.41). The three 
+  short points are single tape lengths and sit a flat +2 cm over truth. The 4 and 6 m points were chained from 
+  a 2 m tape, so the error there lives in the "true" value and not in the sensor; re-measuring the 6 m mark afterwards 
+  gave nearer 620 cm, putting that reading at +4 cm. The measuring error also stacked for each 2 meters beacuse i dont
+  have a long measuring tape (only 1, 2 meter long). The internal temp read 36 to 41 C throughout, which is the chip 
+  self-heating rather than air temperature, so temp_c must not be read as ambient.
+ 
+  ![Open sea, the rippled condition all surface measurements were taken in](Medialibrary/LIDAR-bench-test/ripple-conditions.jpg)
+
+  At the water the sea was rippled with wind chop and stayed that way; no glassy patches were available. Surface return was
+  measured at three heights: rig 140 cm -> 141.3 cm, std 2.5, 200/200 valid, strength 4320; rig 130 cm -> 129.3 cm, 
+  std 2.9, 200/200, strength 3527; rig 120 cm -> 118.2 cm, std 6.5, 200/200, strength 2286. Distance tracks height to 
+  within 2 cm at all three, which is a surface return and a valid height source over rippled sea. Strength sits high, 
+  2000 to 4000, because chop scatters light diffusely back instead of mirroring it away.
+
+  The first intended test was to try to find a relatively calm water beeing both deep and shallow 10cm vs 50cm. 
+  In the same water it was planned that the "rippled conditions" should also be tested. However the actual sea was 
+  never extremely calm so there was a completely stillwater test and then just regular waves. So the calm_shallow
+  beeing talked abt in the next paragraph is completely stillwater and not calm like first intended. 
+ 
+  One spot gave the opposite result. In clear shallow water over light rounded stone, rig 125 cm read 153.6 cm, 
+  std 0.67, 200/200 valid, strength 784, so the sensor sat 28.6 cm long. The wall calibration puts the sensor 
+  within about 2 cm of truth at this range, so the gap is real rather than an artefact of the instrument. Every 
+  stone on the bottom was visible by eye through that water, so 850 nm reaches it too, and the 0.67 cm std is 
+  the tightest number in the whole set, matching a solid stationary bottom rather than a moving surface. This 
+  is a bottom return with roughly 27 cm of water beneath, and the variable is turbidity rather than salt: this 
+  was seawater, but crystal clear. Near-shore clear shallow water is therefore a real trap for the height source 
+  even though dark deep water is not. The picture under shows the only place where water was "still".
+ 
+  ![The clear shallow pool that produced the bottom return, stones visible through the surface](Medialibrary/LIDAR-bench-test/shallow-water-detail.jpg)
+ 
+  Incidence angle was swept under ripples, out of order and with 0 repeated at the end so rig drift would show: 0 deg 
+  -> 200/200, 126 cm, strength 2672; 5 deg -> 398/400, 123 cm, strength 1501; 10 deg -> 400/400, 137 cm, strength 1285; 
+  15 deg -> 200/200, 138 cm, strength 879; 20 deg -> 200/200, 147 cm, strength 391; 25 deg -> 198/200, 151 cm, strength 
+  542; 30 deg -> 188/200, 176 cm, strength 335. Validity holds at or near 100 percent out to 25 deg and drops to 94 at 30, 
+  but strength collapses from 2672 to 335 across the sweep, so the margin thins badly even while returns stay valid. This 
+  is the ripple case, the easy one, so it does not set max_tilt_deg. Absolute distances also run long here: rig height was 
+  logged as 110 cm, but the wall calibration says the sensor is accurate at this range, so the sensor actually sat nearer 
+  125 cm and the rig-height field was mis-measured by roughly 15 cm. Distance grows faster than h/cos(theta) as well, an 
+  angle-dependent long bias under ripples that is worth a closer look.
+ 
+  One early file was discarded. It read a flat ~2000 cm with falling strength and rising dropouts, and the cause was red 
+  and white swapped at the sensor, so Vcc drew about 3.3 V off the TX pin instead of 5 V off VIN and the sensor ran browned out. 
+  The re-test after fixing the wiring was clean. Two things follow: check power wiring before anything else, and the wall baseline is what separates a rig fault from a real water result, because without it a 20 m reading and a genuine bottom return look equally plausible.
+ 
+  Confirmed by this data: surface return is a valid height source over rippled sea, tracking height within 2 cm across three heights at strength 2000 to 4000, on a fixed +2 cm datum offset with no scale error. Bottom return in clear shallow water over light stone is a genuine near-shore failure of the height source (+28.6 cm, tightest std in the set) and cannot be ruled out.
+
+  Not obtained/not concluded specular return over a flat, calm surface near nadir was never measured, because no glassy water was available. The tilt limit for calm water is therefore left open (max_tilt_deg unset), and behaviour over deeper clear water is untested. These are open items, not implied passes.
+
+  One note on scope. This is the rippled case, the forgiving one, and it passed. That is a real result, but it is a floor rather than a ceiling. The maritime ambition is not ruled out by these findings, but neither is it validated in its harder form: sheltered fish-farm water in a fjord on a cold, windless morning is often mirror-flat, and that is exactly the specular near-nadir case left uncharacterised here. The honest reading is that the height source is confirmed over open rippled sea, fails in clear shallow near-shore water, and has flat-calm behaviour still to be characterised.
 
 ## Planned
 
