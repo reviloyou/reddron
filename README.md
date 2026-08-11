@@ -276,6 +276,42 @@ VS Code with PlatformIO.
   Not obtained/not concluded specular return over a flat, calm surface near nadir was never measured, because no glassy water was available. The tilt limit for calm water is therefore left open (max_tilt_deg unset), and behaviour over deeper clear water is untested. These are open items, not implied passes.
 
   One note on scope. This is the rippled case, the forgiving one, and it passed. That is a real result, but it is a floor rather than a ceiling. The maritime ambition is not ruled out by these findings, but neither is it validated in its harder form: sheltered fish-farm water in a fjord on a cold, windless morning is often mirror-flat, and that is exactly the specular near-nadir case left uncharacterised here. The honest reading is that the height source is confirmed over open rippled sea, fails in clear shallow near-shore water, and has flat-calm behaviour still to be characterised.
+- **August 11:** This won't be a long log since the problems were already mentioned on
+  August 3-4. That entry flagged the two-hotspot bug and promised "coding mistakes" would
+  get corrected. This is that correction landing, across four files: `pillar_b.py`,
+  `centroid_detector.py`, `test_full_pipeline.py`, `test_pillar_b.py`.
+
+  `pillar_b.py` turned out to be a docstring bug, not a code bug: `height_m` was
+  documented as camera-to-ground, but the code was already correctly treating it as
+  flight-controller-to-ground. Fixed the docstring. `F_U`, `F_V` and `LEVER_ARM_B` are
+  untouched, still waiting on bench calibration and CAD.
+
+  `centroid_detector.py` is the actual August 3-4 bug: two people overboard, or two hot
+  pixels, used to merge into one centroid sitting in the water between them. Rewritten to
+  threshold, label connected regions (`scipy.ndimage.label`), reject by a size band, and
+  return a list instead of a single point. Two blobs now return two detections, confirmed
+  over 100 trials. Added an absolute contrast floor on top of the old adaptive threshold,
+  so a noise-only frame returns an empty list instead of confidently reporting a target
+  directly under the aircraft, also 100/100 clean. Noise estimate switched from the std of
+  sub-threshold pixels (measured 0.947 against a true 0.5, inflated by the blob's own
+  skirt) to median/MAD (measures 0.543). Centroid weighting switched from raw pixel value
+  to background-subtracted, which narrows the frame-edge bias from August 1-2 but does not
+  eliminate it — truncation at the frame boundary is a separate, still-open cause.
+
+  `test_full_pipeline.py` adapted to the new list return: "valid" now means exactly one
+  detection, not "at least one", so a spurious split counts as a failure the same as a
+  miss does. Median error held at 0.072 m through the rewrite, nudged to 0.068 m after the
+  background-subtraction change.
+
+  `test_pillar_b.py` was decorative before this: `check()` results were computed and
+  printed but never collected, and the script always exited 0 regardless. It now collects
+  results and exits 1 on any failure. Two lines that used to only print a number (front row
+  v=0, rear row v=23) are real asserts now — confirmed by deliberately breaking a sign in
+  `mounting_matrix` in an isolated copy and watching exactly those two catch it while every
+  older check stayed green. Also added three lever-arm test cases (every prior test used
+  `ZERO_LEVER`, which hides the camera-vs-FC height distinction entirely) and latency as a
+  fourth Monte Carlo error source, since a stale attitude paired with a fresh frame is a
+  pure translation error that was completely unmodelled before. 25/25 checks passing.
 
 ## Planned
 
