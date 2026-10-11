@@ -11,6 +11,10 @@ import pillar_b as pb
 import synthetic_frames as sf
 import centroid_detector as cd
 
+# No lever arm here: this test isolates detection error, so the camera's
+# physical offset from the flight controller is deliberately not modelled.
+# Defined locally rather than assigned onto pillar_b, which would mutate another module's namespace from a test file.
+ZERO_LEVER = np.zeros(3)
 
 def run_full_pipeline_test(n_frames=200, heights=[5.0], attitudes=None, rng=None):
     """Run synthetic frames through the entire Pillar B chain.
@@ -33,11 +37,19 @@ def run_full_pipeline_test(n_frames=200, heights=[5.0], attitudes=None, rng=None
         'frame' : raw 32x24 array
         'u_true', 'v_true' : ground truth pixel position
         'u_est', 'v_est' : detected centroid
+        'n_detections' : number of regions detect_centroids() returned
         'north_true', 'east_true' : ground truth position (metres from FC)
         'north_est', 'east_est' : estimated ground position
         'error_m' : Euclidean distance error
         'off_nadir' : angle from nadir for this true position
-        'valid' : detection succeeded
+        'valid' : exactly one detection, matched against ground truth
+
+    Each synthetic frame has exactly one blob (synthetic_frames.py does
+    not generate multiple), so a valid result here means
+    detect_centroids() found exactly one region. Zero regions is a missed
+    detection; more than one is a spurious split of a single blob, and
+    both count as failures rather than silently picking one candidate,
+    since either would hide a real regression in the detector.
     """
     if rng is None:
         rng = np.random.default_rng(42)
@@ -69,21 +81,29 @@ def run_full_pipeline_test(n_frames=200, heights=[5.0], attitudes=None, rng=None
         
         # Generate frame
         frame = sf.create_synthetic_frame(u_true, v_true, rng=rng)
-        
-        # Detect centroid
-        u_est, v_est, n_px, snr = cd.detect_centroid(frame)
-        valid_detection = u_est is not None
-        
+
+        # Detect regions. Each synthetic frame has one true blob, so
+        # "valid" means detect_centroids() found exactly one region, not
+        # just "at least one" (a spurious split is also a failure).
+        detections = cd.detect_centroids(frame)
+        valid_detection = len(detections) == 1
+        if valid_detection:
+            u_est, v_est = detections[0]['u'], detections[0]['v']
+            n_px, snr = detections[0]['n_pixels'], detections[0]['snr']
+        else:
+            u_est = v_est = None
+            n_px, snr = sum(d['n_pixels'] for d in detections), 0.0
+
         # Compute ground truth position
         if valid_detection:
             # True transform
             north_true, east_true, off_nadir = pb.pixel_to_ground_ned(
-                u_true, v_true, h, R_nb, pb.ZERO_LEVER, R_bc)
+                u_true, v_true, h, R_nb, ZERO_LEVER, R_bc)
             
             # Estimated transform
             try:
                 north_est, east_est, _ = pb.pixel_to_ground_ned(
-                    u_est, v_est, h, R_nb, pb.ZERO_LEVER, R_bc)
+                    u_est, v_est, h, R_nb, ZERO_LEVER, R_bc)
             except ValueError:
                 # Ray does not point downward (very rare with small attitudes)
                 north_est, east_est = np.nan, np.nan
@@ -104,6 +124,7 @@ def run_full_pipeline_test(n_frames=200, heights=[5.0], attitudes=None, rng=None
             'v_true': v_true,
             'u_est': u_est,
             'v_est': v_est,
+            'n_detections': len(detections),
             'n_pixels': n_px,
             'snr': snr,
             'north_true': north_true,
@@ -115,11 +136,6 @@ def run_full_pipeline_test(n_frames=200, heights=[5.0], attitudes=None, rng=None
             'valid': valid_detection,
             'height': h,
         }
-
-
-# Placeholder for when hardware is absent
-pb.ZERO_LEVER = np.array([0.0, 0.0, 0.0])
-
 
 if __name__ == '__main__':
     print("Running full Pillar B pipeline test...\n")
@@ -138,7 +154,7 @@ if __name__ == '__main__':
                     f"true ({result['u_true']:.1f}, {result['v_true']:.1f}) "
                     f"-> est ({result['u_est']:.2f}, {result['v_est']:.2f})  "
                     f"error {result['error_m']:.3f} m  "
-                    f"SNR {result['snr']:.1f} dB  "
+                    f"SNR {result['snr']:.1f}x  "
                     f"off-nadir {result['off_nadir']:.1f} deg"
                 )
     

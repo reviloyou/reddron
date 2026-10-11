@@ -38,7 +38,7 @@ C_V = (N_ROWS - 1) / 2.0      # 11.5
 F_U_NOMINAL = (N_COLS / 2.0) / np.tan(np.radians(FOV_COLS_DEG / 2.0))
 F_V_NOMINAL = (N_ROWS / 2.0) / np.tan(np.radians(FOV_ROWS_DEG / 2.0))
 
-# These two disagree by ~24%, which is physically impossible for square
+# These two disagree by ~19%, which is physically impossible for square 
 # detector pixels behind one lens. One datasheet number is defined
 # differently (corner-to-corner vs edge-to-edge) or rounded. Replace both
 # with measured values from calibrate_intrinsics() before flight.
@@ -170,7 +170,13 @@ def pixel_to_ground_ned(u, v, height_m, R_nb,
     """Full chain. Returns (north_m, east_m) of the target relative to the
     flight controller's position, plus diagnostics.
 
-    height_m is the vertical distance from the CAMERA to the ground.
+    height_m is the vertical distance from the FLIGHT CONTROLLER to the
+    ground (what a LiDAR or barometer referenced to the FC reports), not
+    from the camera. The camera sits lever_arm_b away from the FC, so this
+    function derives the camera's own height internally
+    (h_cam = height_m - cam_offset_n[2]) before tracing the ray. Passing a
+    camera-to-ground height here double-counts the lever arm's vertical
+    component.
     """
     if R_bc is None:
         R_bc = mounting_matrix()
