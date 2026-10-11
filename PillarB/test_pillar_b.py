@@ -128,21 +128,49 @@ SIGMA_ATT = np.radians(1.0)
 SIGMA_H = 0.06
 SIGMA_PX = 0.5
 
-# The thermal frame and the MAVLink attitude it gets paired with arrive at
-# different instants. Until frames carry a timestamp attitude_interpolator
-# can SLERP against (A6, reserved, not implemented here), whatever attitude
-# is "current" when a frame is processed is off by this latency, and the
-# aircraft has moved ground_speed * latency in the meantime. That is a pure
-# translation: it does not depend on attitude, pixel position or height, so
-# unlike the other three sources it is added directly to the ground
-# position rather than run back through pixel_to_ground_ned.
+# Timing error between a frame and the MAVLink data it is paired with.
+#
+# The orchestrator looks attitude up at each subpage's own timestamp
+# (attitude_interpolator.py), which removes the staleness that comes from
+# sampling attitude at a finite rate, and subpage pairing (F1) cancels the
+# 125 ms skew between the two halves of a frame. Neither can remove an
+# error in the timestamps themselves. The subpage is stamped on the
+# ESP32's clock and the attitude on the flight controller's, and any error
+# in mapping one onto the other (link latency folded into the offset,
+# processing delay) means attitude and position are looked up at the wrong
+# instant. That error is modelled here as a latency, and it is a separate
+# term from the subpage skew: both belong in the budget.
+#
+# A latency has two effects, and they are not the same kind of error:
+#
+#   * Stale position. The aircraft has moved ground_speed * latency since
+#     the fix. That is a pure translation: it does not depend on attitude,
+#     pixel position or height, so it is added directly to the ground
+#     position.
+#   * Stale attitude. The aircraft has rotated angular_rate * latency, so
+#     the ray is traced from the wrong orientation. That is a rotation of
+#     the ray, and the ground error it causes scales with height: at a
+#     fixed angle, twice as high is twice the error. It has to go back
+#     through pixel_to_ground_ned.
+#
+# Both come from the same delay on the same link, so their magnitudes are
+# correlated: one latency draw drives both. Reported below with one shared
+# draw (correlated), with separate draws (independent), and as the aligned
+# worst case where the two ground errors point the same way and add
+# linearly.
 GROUND_SPEED_MS = 3.0     # cruise/search speed, matches the CLAUDE.md worked example
 LATENCY_MEAN_S = 0.050    # MAVLink-over-UART + ESP32 processing, assumed until measured
 LATENCY_JITTER_S = 0.020  # placeholder spread on the same assumption
+# Body angular rate while the frame is taken. 30 deg/s is a manoeuvring
+# figure (the one CLAUDE.md's per-axis table and the subpage-skew figures
+# use), not a steady search-leg figure, so the rotational term below is an
+# upper-end estimate. The error scales linearly with this rate.
+ANGULAR_RATE_DEG_S = 30.0
+ANGULAR_RATE = np.radians(ANGULAR_RATE_DEG_S)
 
 
 def latency_translation_error(ground_speed_ms, latency_s, rng):
-    """Displacement from pairing a frame with a stale attitude sample.
+    """Displacement from pairing a frame with a stale position fix.
     Heading is drawn uniformly at random: this is a generic error budget,
     not a specific flight leg, so the direction of travel is not fixed."""
     displacement = ground_speed_ms * max(latency_s, 0.0)
@@ -150,11 +178,38 @@ def latency_translation_error(ground_speed_ms, latency_s, rng):
     return displacement * np.cos(heading), displacement * np.sin(heading)
 
 
+def latency_rotation(angular_rate_rad_s, latency_s, axis_b):
+    """Body-frame rotation separating the true attitude from the stale one:
+    angular_rate * latency about the unit axis axis_b (Rodrigues). The
+    stale attitude used for the ray is R_nb @ latency_rotation(...)."""
+    angle = angular_rate_rad_s * max(latency_s, 0.0)
+    k = np.asarray(axis_b, dtype=float)
+    k = k / np.linalg.norm(k)
+    K = np.array([[0.0, -k[2], k[1]],
+                  [k[2], 0.0, -k[0]],
+                  [-k[1], k[0], 0.0]])
+    return np.eye(3) + np.sin(angle) * K + (1.0 - np.cos(angle)) * (K @ K)
+
+
+def random_axis(rng):
+    """Unit vector uniform on the sphere: the rotation during the lag can
+    be about any body axis, weighted equally."""
+    a = rng.normal(size=3)
+    return a / np.linalg.norm(a)
+
+
 n_true, e_true, _ = pb.pixel_to_ground_ned(
     pb.C_U, pb.C_V, H, LEVEL, ZERO_LEVER, tilted)
 
+# The stale-attitude draws come from their own generator, so every figure
+# the earlier version of this section printed is reproduced exactly and
+# stays comparable.
+rng_lat = np.random.default_rng(61)
+
 errs = []
 errs_no_latency = []
+errs_corr = []
+errs_indep = []
 for _ in range(20000):
     R = pb.euler_to_rotation(*rng.normal(0.0, SIGMA_ATT, 3))
     h = H + rng.normal(0.0, SIGMA_H)
@@ -164,18 +219,37 @@ for _ in range(20000):
     errs_no_latency.append(np.hypot(n - n_true, e - e_true))
     lat_s = rng.normal(LATENCY_MEAN_S, LATENCY_JITTER_S)
     dn, de = latency_translation_error(GROUND_SPEED_MS, lat_s, rng)
-    n += dn
-    e += de
-    errs.append(np.hypot(n - n_true, e - e_true))
+    errs.append(np.hypot(n + dn - n_true, e + de - e_true))
+
+    # Stale attitude as well, driven by the same latency draw.
+    axis = random_axis(rng_lat)
+    n_c, e_c, _ = pb.pixel_to_ground_ned(
+        u, v, h, R @ latency_rotation(ANGULAR_RATE, lat_s, axis), ZERO_LEVER, tilted)
+    errs_corr.append(np.hypot(n_c + dn - n_true, e_c + de - e_true))
+
+    # The same, with the attitude's latency drawn separately. Same axis, so
+    # the only difference between the two columns is the correlation.
+    lat_ind = rng_lat.normal(LATENCY_MEAN_S, LATENCY_JITTER_S)
+    n_i, e_i, _ = pb.pixel_to_ground_ned(
+        u, v, h, R @ latency_rotation(ANGULAR_RATE, lat_ind, axis), ZERO_LEVER, tilted)
+    errs_indep.append(np.hypot(n_i + dn - n_true, e_i + de - e_true))
 
 errs = np.array(errs)
 errs_no_latency = np.array(errs_no_latency)
-print(f"  without latency: mean {errs_no_latency.mean():.3f} m   "
-     f"median {np.median(errs_no_latency):.3f} m")
-print(f"  new combined total (with latency):")
-print(f"    mean   {errs.mean():.3f} m")
-print(f"    median {np.median(errs):.3f} m")
-print(f"    p95    {np.percentile(errs, 95):.3f} m")
+errs_corr = np.array(errs_corr)
+errs_indep = np.array(errs_indep)
+
+
+def summary(x):
+    return (f"mean {x.mean():.3f}   median {np.median(x):.3f}   "
+            f"p95 {np.percentile(x, 95):.3f}   rms {np.sqrt(np.mean(x ** 2)):.3f} m")
+
+
+print(f"  without latency:                         {summary(errs_no_latency)}")
+print(f"  + stale position only (before F4):       {summary(errs)}")
+print(f"  + stale position and stale attitude, at {ANGULAR_RATE_DEG_S:.0f} deg/s about a random axis:")
+print(f"      correlated, one latency draw:        {summary(errs_corr)}")
+print(f"      independent, two latency draws:      {summary(errs_indep)}")
 
 print("\n  Contribution of each source in isolation (RMS, metres):")
 for name, sa, sh, sp in [("attitude 1 deg", SIGMA_ATT, 0, 0),
@@ -196,8 +270,72 @@ for _ in range(8000):
     lat_s = rng.normal(LATENCY_MEAN_S, LATENCY_JITTER_S)
     dn, de = latency_translation_error(GROUND_SPEED_MS, lat_s, rng)
     d.append(np.hypot(dn, de))
-print(f"    {'latency 50+-20 ms':<18} {np.sqrt(np.mean(np.square(d))):.3f}  "
-     f"(at {GROUND_SPEED_MS:.0f} m/s ground speed)")
+rms_translation = np.sqrt(np.mean(np.square(d)))
+print(f"    {'latency 50+-20 ms':<18} {rms_translation:.3f}  "
+     f"(stale position, at {GROUND_SPEED_MS:.0f} m/s ground speed)")
+
+# Stale attitude alone, and the two latency effects combined, with
+# nothing else perturbed.
+d_rot, d_corr, d_indep = [], [], []
+for _ in range(8000):
+    lat_s = rng_lat.normal(LATENCY_MEAN_S, LATENCY_JITTER_S)
+    lat_other = rng_lat.normal(LATENCY_MEAN_S, LATENCY_JITTER_S)
+    axis = random_axis(rng_lat)
+    dn_t, de_t = latency_translation_error(GROUND_SPEED_MS, lat_s, rng_lat)
+    rot = []
+    for lat in (lat_s, lat_other):
+        n_r, e_r, _ = pb.pixel_to_ground_ned(
+            pb.C_U, pb.C_V, H, latency_rotation(ANGULAR_RATE, lat, axis), ZERO_LEVER, tilted)
+        rot.append((n_r - n_true, e_r - e_true))
+    d_rot.append(np.hypot(*rot[0]))
+    d_corr.append(np.hypot(rot[0][0] + dn_t, rot[0][1] + de_t))
+    d_indep.append(np.hypot(rot[1][0] + dn_t, rot[1][1] + de_t))
+rms_rotation = np.sqrt(np.mean(np.square(d_rot)))
+print(f"    {'stale attitude':<18} {rms_rotation:.3f}  "
+     f"(same latency, {ANGULAR_RATE_DEG_S:.0f} deg/s about a random axis)")
+print(f"\n  The two latency effects together, nothing else perturbed:")
+print(f"    correlated, one draw      rms {np.sqrt(np.mean(np.square(d_corr))):.3f}   "
+      f"p95 {np.percentile(d_corr, 95):.3f} m")
+print(f"    independent, two draws    rms {np.sqrt(np.mean(np.square(d_indep))):.3f}   "
+      f"p95 {np.percentile(d_indep, 95):.3f} m")
+print(f"    aligned worst case        rms {rms_translation + rms_rotation:.3f} m "
+      f"(errors pointing the same way add linearly)")
+print("  With the directions of travel and rotation unrelated, the shared delay\n"
+      "  barely moves the RMS: the cross term averages out over direction, so\n"
+      "  quadrature is the right RMS figure. What the correlation does change is\n"
+      "  the tail, since one long delay makes both errors large at once. When the\n"
+      "  geometry lines the two up the budget is the linear sum, which is the\n"
+      "  figure to plan against for a manoeuvre that couples them.")
+
+print(f"\n  Stale attitude at a fixed 50 ms lag, {ANGULAR_RATE_DEG_S:.0f} deg/s, "
+      f"one axis at a time (CLAUDE.md F4 table):")
+LAG_S = 0.050
+per_axis = {}
+for name, axis, expected in [("pitch", [0.0, 1.0, 0.0], 0.138),
+                             ("roll", [1.0, 0.0, 0.0], 0.131),
+                             ("yaw", [0.0, 0.0, 1.0], 0.029)]:
+    n_s, e_s, _ = pb.pixel_to_ground_ned(
+        pb.C_U, pb.C_V, H, latency_rotation(ANGULAR_RATE, LAG_S, axis), ZERO_LEVER, tilted)
+    per_axis[name] = np.hypot(n_s - n_true, e_s - e_true)
+    check(f"stale attitude, {name} {np.degrees(ANGULAR_RATE * LAG_S):.1f} deg -> ground error",
+          per_axis[name], expected, tol=0.001)
+print(f"  against {GROUND_SPEED_MS * LAG_S:.3f} m for the stale position at the same lag.")
+print(f"  Yaw is {per_axis['pitch'] / per_axis['yaw']:.1f}x smaller than pitch: the ray is "
+      f"near vertical, and rotating\n  about the vertical barely moves a point beneath the "
+      f"aircraft. Near the frame centre,\n  heading accuracy matters far less than tilt "
+      f"accuracy: the compass does not need to be\n  as good as the gyro.")
+
+# The property the old comment denied: the rotational error scales with
+# height, the translation does not. Exact for a zero lever arm, since
+# every ground offset is then height times a function of the ray alone.
+R_lag = latency_rotation(ANGULAR_RATE, LAG_S, [0.0, 1.0, 0.0])
+err_at = {}
+for h_test in (H, 2 * H):
+    n_ref, e_ref, _ = pb.pixel_to_ground_ned(pb.C_U, pb.C_V, h_test, LEVEL, ZERO_LEVER, tilted)
+    n_s, e_s, _ = pb.pixel_to_ground_ned(pb.C_U, pb.C_V, h_test, R_lag, ZERO_LEVER, tilted)
+    err_at[h_test] = np.hypot(n_s - n_ref, e_s - e_ref)
+check("stale attitude error doubles when height doubles (ratio)",
+      err_at[2 * H] / err_at[H], 2.0, tol=1e-9)
 
 print(f"\n  Latency alone at fixed ground speed, reference points from "
      f"CLAUDE.md (ground speed {GROUND_SPEED_MS:.0f} m/s):")

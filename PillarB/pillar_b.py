@@ -38,7 +38,7 @@ C_V = (N_ROWS - 1) / 2.0      # 11.5
 F_U_NOMINAL = (N_COLS / 2.0) / np.tan(np.radians(FOV_COLS_DEG / 2.0))
 F_V_NOMINAL = (N_ROWS / 2.0) / np.tan(np.radians(FOV_ROWS_DEG / 2.0))
 
-# These two disagree by ~24%, which is physically impossible for square
+# These two disagree by ~19%, which is physically impossible for square 
 # detector pixels behind one lens. One datasheet number is defined
 # differently (corner-to-corner vs edge-to-edge) or rounded. Replace both
 # with measured values from calibrate_intrinsics() before flight.

@@ -11,6 +11,10 @@ import pillar_b as pb
 import synthetic_frames as sf
 import centroid_detector as cd
 
+# No lever arm here: this test isolates detection error, so the camera's
+# physical offset from the flight controller is deliberately not modelled.
+# Defined locally rather than assigned onto pillar_b, which would mutate another module's namespace from a test file.
+ZERO_LEVER = np.zeros(3)
 
 def run_full_pipeline_test(n_frames=200, heights=[5.0], attitudes=None, rng=None):
     """Run synthetic frames through the entire Pillar B chain.
@@ -94,12 +98,12 @@ def run_full_pipeline_test(n_frames=200, heights=[5.0], attitudes=None, rng=None
         if valid_detection:
             # True transform
             north_true, east_true, off_nadir = pb.pixel_to_ground_ned(
-                u_true, v_true, h, R_nb, pb.ZERO_LEVER, R_bc)
+                u_true, v_true, h, R_nb, ZERO_LEVER, R_bc)
             
             # Estimated transform
             try:
                 north_est, east_est, _ = pb.pixel_to_ground_ned(
-                    u_est, v_est, h, R_nb, pb.ZERO_LEVER, R_bc)
+                    u_est, v_est, h, R_nb, ZERO_LEVER, R_bc)
             except ValueError:
                 # Ray does not point downward (very rare with small attitudes)
                 north_est, east_est = np.nan, np.nan
@@ -132,11 +136,6 @@ def run_full_pipeline_test(n_frames=200, heights=[5.0], attitudes=None, rng=None
             'valid': valid_detection,
             'height': h,
         }
-
-
-# Placeholder for when hardware is absent
-pb.ZERO_LEVER = np.array([0.0, 0.0, 0.0])
-
 
 if __name__ == '__main__':
     print("Running full Pillar B pipeline test...\n")

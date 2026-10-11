@@ -85,8 +85,34 @@ def detect_centroids(frame, threshold=None, min_pixels=5, max_pixels=100,
     list of dict
         One entry per accepted region: 'u', 'v' (subpixel centroid),
         'n_pixels', 'snr' (peak above background over noise sigma, a
-        plain ratio, NOT decibels). Empty list if nothing passes. Sorted
-        by n_pixels, largest first.
+        plain ratio, NOT decibels), and 'touches_edge'. Empty list if
+        nothing passes. Sorted by n_pixels, largest first.
+
+    Notes on 'touches_edge'
+    -----------------------
+    True when the region's bounding box reaches column 0 or 31, or row 0
+    or 23. Such a region is cut off by the frame boundary: the part of
+    the blob that fell outside was never measured, so the surviving
+    footprint is asymmetric and the centroid is pulled inward.
+
+    Measured with the default synthetic blob (sigma_px 1.5), a target
+    whose true centre is at u = 0 is reported at u = 0.447, and one at
+    u = 31 at u = 30.554. At 5 m altitude that is 7.4 cm of ground error,
+    always directed toward the frame centre. A target one column further
+    in (u = 1) shows a bias of +0.007 px, so the effect is confined to
+    regions that actually reach the boundary.
+
+    The flag is deliberately conservative: it also fires on regions whose
+    bounding box merely reaches the boundary without being meaningfully
+    cut off, so roughly the outer two-pixel ring gets marked and the
+    unflagged interior is about 73 percent of the frame. It marks rather
+    than rejects; the caller decides.
+
+    This is not noise and averaging frames does not remove it. No
+    reweighting can fix it either, since the missing pixels carry no
+    information (T8 addressed the background-as-uniform-weight component
+    and moved the bias only from 0.475 to 0.447). The same truncation
+    will occur with the real sensor.
     """
     frame = np.asarray(frame, dtype=float)
     background, sigma = _background_stats(frame)
@@ -132,7 +158,15 @@ def detect_centroids(frame, threshold=None, min_pixels=5, max_pixels=100,
         peak = float(np.max(raw))
         snr = (peak - background) / sigma if sigma > 0 else 0.0
 
-        detections.append({'u': u_c, 'v': v_c, 'n_pixels': n_px, 'snr': snr})
+        # Bounding box of the region, used only to decide whether the
+        # blob was cut off by the frame boundary.
+        rows_hit = np.flatnonzero(region_mask.any(axis=1))
+        cols_hit = np.flatnonzero(region_mask.any(axis=0))
+        touches_edge = bool(cols_hit[0] == 0 or cols_hit[-1] == frame.shape[1] - 1
+                            or rows_hit[0] == 0 or rows_hit[-1] == frame.shape[0] - 1)
+
+        detections.append({'u': u_c, 'v': v_c, 'n_pixels': n_px, 'snr': snr,
+                           'touches_edge': touches_edge})
 
     detections.sort(key=lambda d: d['n_pixels'], reverse=True)
     return detections
