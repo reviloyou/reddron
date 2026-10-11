@@ -11,6 +11,9 @@ venv/
 .pioenvs/
 .piolibdeps/
 
+# WiFi credentials for the SITL build; only secrets.example.h is committed
+PillarB/firmware/include/secrets.h
+
 # VS Code (behold extensions.json, ignorer resten)
 .vscode/*
 !.vscode/extensions.json
