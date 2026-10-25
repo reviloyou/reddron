@@ -6,7 +6,7 @@ to make a drone that finds a person who has fallen into water and drops flotatio
 them before a rescue crew can reach the scene.
 
 The design ambition is heavy-weather maritime search and rescue in Finnmark. This
-build is a proof of concept flown in benign conditions, but the mission computer is
+build is a proof of concept to be flown in benign conditions, but the mission computer is
 built to be hardware-agnostic so the same module can move to a larger airframe later.
 
 The reason I picked this problem is that it is one many hear about. Several of my friends
