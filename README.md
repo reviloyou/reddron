@@ -31,8 +31,7 @@ at.
 The system is split into three pillars:
 
 - **Pillar A: custom airframe and CFD.** Deferred entirely. A scratch-designed airframe
-  was out of scope for the timeframe, so this build uses a commercial mark4 7-inch frame.
-  Cutting this was a deliberate decision to keep the remaining two pillars achievable at a level worth presenting.
+  would not provide much more value as a proof of concept, so this build uses a commercial mark4 7-inch frame.
 - **Pillar B: thermal target localization.** An MLX90640 thermal array, a TFmini-S
   LiDAR and the flight controller's EKF attitude are fused to convert a hot pixel into
   a GPS coordinate on the ground. This is the core of the project.
