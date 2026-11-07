@@ -2,7 +2,7 @@
 
 ![reddron set up in CAD, seen from below](Medialibrary/Drone-assembly/Preview-droneassembly.png)
 
-*Concept  of the current CAD assembly, seen from below where the sensing and drop system sits.*
+*Current CAD assembly, seen from below where the sensing and drop system sits.*
 
 This functions as an overview for the reddron project. The reddron project name makes a
 little more sense if you know the Norwegian word "redde", or "to save". We are trying
