@@ -1,5 +1,9 @@
 # reddron
 
+![reddron set up in CAD, seen from below](Medialibrary/Drone-assembly/Preview-droneassembly.png)
+
+*Concept  of the current CAD assembly, seen from below where the sensing and drop system sits.*
+
 This functions as an overview for the reddron project. The reddron project name makes a
 little more sense if you know the Norwegian word "redde", or "to save". We are trying
 to make a drone that finds a person who has fallen into water and drops flotation to
@@ -67,8 +71,8 @@ point: the module is the deliverable, the quadcopter is the test platform.
 | Drop servo | DFRobot SER0006 on FC PWM5 |
 | Attitude source | EKF quaternion from ArduPilot over MAVLink |
 
-**Printed parts:** eSUN PETG Black for sensor pod, drop cradle and GPS mast. Landing
-skids in PETG with TPU feet.
+**Printed parts:** eSUN PETG Black for sensor pod, drop cradle and GPS mount. Landing
+legs clamped to the arms in PETG, with snap-on TPU feet.
 
 Firmware target is ArduPilot `MicoAir743v2`. Mission computer firmware is built in
 VS Code with PlatformIO.
@@ -298,11 +302,9 @@ VS Code with PlatformIO.
   got confirmation about the other parameters including that there is no exception to the rule of 
   outside drops unless we get a really expensive license wich i cant afford.
 
-  **September 2026**
-
 **September 2026**
 
-- **September 13:** After a long break from the log, back to code, done with Claude Code from a
+- **September 13:** After a long break from the log, back to code, done with Claude Code from my
   written spec. The MLX90640 reads each frame in two halves 125 ms apart, and the pipeline used
   one attitude for both, so under rotation the halves disagreed about where the target was.
   `orchestrator.py` now looks attitude up for each half at its own timestamp, turns each half's
@@ -317,8 +319,7 @@ VS Code with PlatformIO.
   into the rest of Pillar B's software, which its name no longer describes. I wrote a brief with
   fixed rules (`F_U`, `F_V` and `LEVER_ARM_B` stay untouched until bench calibration, no data is
   ever dropped silently, every rejection gets a counter, every test suite must pass after every
-  task) and used Claude Code to implement it task by task. Most of the code and tests below were
-  written that way.
+  task) and used Claude Code to implement it task by task. 
 
   `mlx90640_stream.cpp` sends the raw MLX90640 readings from the ESP32 to the laptop at 921600
   baud, and `frame_reader.py` turns them into temperatures there. Keeping the raw data means a
@@ -361,6 +362,77 @@ VS Code with PlatformIO.
 - **October 1-3:** Back in SolidWorks on the body making it correctly clip onto the drone. Done
   by printing out and testing so one side can clip onto the mark4 7-inch and and the other side can use
   included screws.
+
+**November 2026**
+
+- **November 5:** A CAD evening on what carries the load and how the drone stands on the ground.
+  The carbon frame takes every flight and landing load, and the PETG body only carries the
+  sensing and drop system, so nothing structural hangs off a print. That also settled how the
+  body prints: lying flat, with extra walls, since the perimeters do more for stiffness than the
+  infill does.
+
+  The thermal camera's tilt in the body is atan(7.93 / 35.77) = 12.50° in CAD, which is what I
+  designed for. That only proves the model. The angle that matters is the one between the camera
+  and the flight controller on the built drone, and 1° of error there moves the ground position
+  about 9 cm at 5 m. So it will be measured optically before any localization test, with a hot
+  target on the floor and the drone held level about 2 m above it.
+
+  The landing gear moved off the body. Instead of PETG skids under the body there are now four
+  legs clamped onto the arms, a third to a half of the way out, which gives a much wider stance
+  than the body could. They are held with M2 screws into brass heat-set inserts, since I already
+  had a kit of both: eight inserts per leg, in two groups of four along the arm, mirrored to all
+  four arms. Below are the earlier body shells and the first leg and clamp attempts that led here.
+
+  ![Earlier body shells and the first leg and clamp attempts](Medialibrary/Drone-assembly/Prototype-scraps.jpg)
+
+- **November 6:** The covers that clamp each leg around its arm. Each cover has a pocket for the
+  5 mm carbon arm with 0.3 mm clearance per side, a 7 x 2.2 mm channel over the arm for the motor
+  wires, and counterbores for M2x10 screws. It stops 0.4 mm above the leg, so the screws squeeze
+  the arm instead of bottoming out plastic on plastic, and the top is flat so it prints upside
+  down without support. A second version removed material that was only there because the first
+  was drawn as a block: a 7 x 13 mm window over the wire channel, no extra walls in the neck and
+  a lower top. That took the four covers from 27.7 g to 23.3 g, about 5.8 g each, and made the
+  most visible part of the legs look lighter too.
+
+  The frame in the assembly is GEPRC's CAD model of the Mark4, the design the Tarot MK4 follows,
+  and the covers fitting the real Tarot frame on the 7th shows the two match where it counts.
+  Checking the covers against it found two things. The frame sits slightly skewed in the
+  assembly, which made exact mirroring awkward, but measured, the four leg
+  positions agree within 0.13 mm sideways and 1.2 mm along the arm. Sideways is what matters for
+  a clamp with 0.3 mm clearance, so that is fine. The real problem was that every cover ran about
+  10 mm³ into the arm plate. Instead of just cutting clearance, the covers were trimmed to sit
+  0.3 mm from the arm plate, so in a hard landing they bear against the frame and get support
+  from it. The legs also overlap the bottom plate slightly in CAD (19.8 and 7.4 mm³). On the real
+  drone that never mattered: room had to be left for the cables there anyway, so the legs never
+  come that close to the plate.
+
+- **November 7:** Not much new design today, mostly building. All 32 brass inserts (M2 x 3 x 3.2)
+  went into the four legs, and the covers were screwed down over the arms with 32 M2x10 screws,
+  with the motor wires laid in the channel under each cover. The legs are on and the drone stands
+  on them. The motor leads are still loose.
+
+  ![Screwing the covers down, the motor wires running in the channel](Medialibrary/Drone-assembly/Legs-under-construction.jpg)
+
+  ![All four legs on and the drone standing on them](Medialibrary/Drone-assembly/Legs-fastned.jpg)
+
+  The one new part was the TPU foot. The leg tip is only 8 x 6 mm, too small to hold a foot in a
+  pocket, so the foot is a boot that snaps over the tip instead: a 0.5 mm groove 2-4 mm above the
+  tip with 45° flanks, and a matching rib inside the boot. The boot has 1.65 mm walls and a 4.5 mm
+  pad and weighs about 1.2 g. Its job is to take the first hit of a landing and keep the PETG tips
+  from chipping on rock or a deck. The legs on the drone are already reprinted with the groove.
+  The boot itself is drawn, not printed, and the fit is nominal. TPU does not print to a
+  twentieth of a millimetre, so I expect a test print or two before the grip is right.
+  The assembly at the top of this README shows the current state, feet in red. The SolidWorks
+  files and STEP exports for the body, legs, covers, foot and full assembly are in `3D prints/`.
+
+  Two questions are still open. The GPS has to sit where carbon does not block the sky: either a
+  low stand on the top plate at the camera end, with the battery moved back and the XT60 leads
+  kept at the far end, or a mast on the same holes as a fallback. Either way it has to pass
+  CompassMot with under 30% interference, because the IST8310 in the BeeID is the only compass.
+  The life vest projectile also needs ballast, both to fall predictably for the lead calculation
+  and to weigh what a real inflatable does (a Restube Automatic is about 245 g). The plan is lead
+  or tungsten in the nose, not steel, which would shift the compass reading the moment it drops,
+  and to settle the amount with a series of test drops rather than on paper.
 
 
 ## Planned
