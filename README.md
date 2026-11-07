@@ -1,7 +1,7 @@
 # reddron
 
 This functions as an overview for the reddron project. The reddron project name makes a
-little more sense if you know the Norwegian word "redde", or "to save". We are trying
+little more sense if you know the Norwegian word "redde", or "to save". I am trying
 to make a drone that finds a person who has fallen into water and drops flotation to
 them before a rescue crew can reach the scene.
 
