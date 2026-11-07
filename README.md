@@ -9,6 +9,10 @@ The design ambition is heavy-weather maritime search and rescue in Finnmark. Thi
 build is a proof of concept to be flown in benign conditions, but the mission computer is
 built to be hardware-agnostic so the same module can move to a larger airframe later.
 
+![reddron set up in CAD, seen from below](Medialibrary/Drone-assembly/Preview-droneassembly.png)
+
+*Current CAD assembly, seen from below where the sensing and drop system sits.*
+
 The reason I picked this problem is that it is one many hear about. Several of my friends
 work on maintaing fish farms and king crab boats along the coast, and going overboard is not a
 hypothetical, it is a thing that happens. The weather here turns fast: a workable
@@ -25,10 +29,6 @@ enough for a working vessel to carry, tough enough to launch in the conditions t
 caused the emergency, and autonomous enough to find a person and drop flotation without
 someone piloting it manually while the crew is busy. That gap is what reddron is aimed
 at.
-
-![reddron set up in CAD, seen from below](Medialibrary/Drone-assembly/Preview-droneassembly.png)
-
-*Current CAD assembly, seen from below where the sensing and drop system sits.*
 
 ## Project structure
 
