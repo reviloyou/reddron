@@ -1,9 +1,5 @@
 # reddron
 
-![reddron set up in CAD, seen from below](Medialibrary/Drone-assembly/Preview-droneassembly.png)
-
-*Current CAD assembly, seen from below where the sensing and drop system sits.*
-
 This functions as an overview for the reddron project. The reddron project name makes a
 little more sense if you know the Norwegian word "redde", or "to save". We are trying
 to make a drone that finds a person who has fallen into water and drops flotation to
@@ -29,6 +25,10 @@ enough for a working vessel to carry, tough enough to launch in the conditions t
 caused the emergency, and autonomous enough to find a person and drop flotation without
 someone piloting it manually while the crew is busy. That gap is what reddron is aimed
 at.
+
+![reddron set up in CAD, seen from below](Medialibrary/Drone-assembly/Preview-droneassembly.png)
+
+*Current CAD assembly, seen from below where the sensing and drop system sits.*
 
 ## Project structure
 
